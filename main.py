@@ -22,8 +22,8 @@ async def upload_image(file: UploadFile = File(...)):
     print(f"Received file: {file.filename}")  # Log the filename
     print(f"Content type: {file.content_type}")  # Log the content type
     try:
-        # Create the uploads/inputs directory if it doesn't exist
-        os.makedirs("uploads/inputs", exist_ok=True)
+        # Create the uploads/outputs directory if it doesn't exist
+        os.makedirs("uploads/outputs", exist_ok=True)
 
         # Read the uploaded file
         contents = await file.read()
@@ -56,3 +56,16 @@ async def read_file(request: Request):  # Accept the request parameter
         return FileResponse(file_path)  # Serve the file if it exists
     else:
         return {"error": "File not found"}  # Return an error if the file does not exist
+
+@app.delete("/clear_uploads")
+async def clear_uploads():
+    try:
+        # Remove all files in the uploads/outputs directory
+        folder_path = "uploads/outputs"
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)  # Delete the file
+        return {"message": "Uploads folder cleared successfully."}
+    except Exception as e:
+        return {"error": str(e)}  # Return the error message
