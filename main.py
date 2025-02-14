@@ -7,8 +7,18 @@ from datetime import datetime
 from fastapi.responses import FileResponse
 import rembg
 from concurrent.futures import ThreadPoolExecutor
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins, adjust as necessary
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 executor = ThreadPoolExecutor(max_workers=2)  # Create a thread pool
 
@@ -53,7 +63,10 @@ async def read_file(request: Request):  # Accept the request parameter
     file_path = f"uploads/outputs/{file_name}"
     print(file_path)
     if os.path.exists(file_path):
-        return FileResponse(file_path)  # Serve the file if it exists
+        return FileResponse(
+            file_path,
+            media_type="image/jpeg"
+        )  # Serve the file if it exists
     else:
         return {"error": "File not found"}  # Return an error if the file does not exist
 
