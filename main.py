@@ -1,10 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Request, Depends, HTTPException, status
+from fastapi import FastAPI, UploadFile, File, Request, Depends, HTTPException, status, Form
 import os
 import io
 from PIL import Image
 import uuid
 from datetime import datetime
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 import rembg
 from concurrent.futures import ThreadPoolExecutor
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,12 @@ import cv2
 import numpy as np
 
 app = FastAPI()
+
+# Configure templates
+templates = Jinja2Templates(directory="templates")
+
+# Mount static files directory if needed
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Add CORS middleware
 app.add_middleware(
@@ -158,9 +166,13 @@ async def clear_uploads():
 
 @app.post("/detect_face_and_crop_image")
 @app.post("/detect_face_and_crop_image/")
-async def crop_image(file: UploadFile = File(...), ratio: float = 1.0):
+async def crop_image(
+    file: UploadFile = File(...),
+    ratio: float = Form(1.0)
+):
     print(f"Received file: {file.filename}")  # Log the filename
     print(f"Content type: {file.content_type}")  # Log the content type
+    print(f"Ratio: {ratio}")
     try:
         # Create the uploads/cropped_output directory if it doesn't exist
         os.makedirs("uploads/cropped_output", exist_ok=True)
@@ -206,7 +218,18 @@ async def read_cropped_file(request: Request):  # Accept the request parameter
     else:
         return {"error": "File not found"}  # Return an error if the file does not exist
 
-
+@app.delete("/clear_cropped_uploads")
+async def clear_cropped_uploads():
+    try:
+        # Remove all files in the uploads/outputs directory
+        folder_path = "uploads/cropped_output"
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)  # Delete the file
+        return {"message": "Uploads folder cleared successfully."}
+    except Exception as e:
+        return {"error": str(e)}  # Return the error message
 
 #=========================================================
 
@@ -252,3 +275,14 @@ def create_token():  # Accept a username as input
     # For simplicity, we are just creating a token for any username provided
     token = jwt.encode({"sub": 'bg_app'}, 'OZI_Backend_BG_Removal', algorithm="HS256")  # Create the token
     return {"token": token}  # Return the generated token
+
+@app.get("/template/{template_name}", response_class=HTMLResponse)
+async def get_template(request: Request, template_name: str):
+    try:
+        # Return the template with the given name
+        return templates.TemplateResponse(f"{template_name}.html", {"request": request})
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template {template_name}.html not found"
+        )
