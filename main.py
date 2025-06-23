@@ -14,6 +14,7 @@ import jwt  # Import the jwt library
 
 import cv2
 import numpy as np
+from insightface.app import FaceAnalysis
 
 app = FastAPI()
 
@@ -22,6 +23,10 @@ templates = Jinja2Templates(directory="templates")
 
 # Mount static files directory if needed
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+#Load RetinaFace model from InsightFace
+model = FaceAnalysis(name="buffalo_l", root='C:/Users/muhammadannasasif/.insightface')
+model.prepare(ctx_id=0) #set to -1 for automatic device (CPU/GPU)
 
 # Add CORS middleware
 app.add_middleware(
@@ -99,6 +104,66 @@ def detect_faces(image, ratio=None):
         ratio_image = image[crop_y1:crop_y2, crop_x1:crop_x2]
     
     return ratio_image
+
+def detect_faces_retinaface(image, ratio=None):
+    
+    if image is None:
+        print(f"Failed to load image")
+        return None, []
+
+    # Detect faces
+    faces = model.get(image)
+
+    if not faces:
+        print("No faces detected.")
+        return None, []
+
+    # Draw bounding boxes and landmarks
+    for face in faces:
+        # box = face.bbox.astype(int)
+        # cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+
+        if face.landmark is not None:
+            for point in face.landmark:
+                cv2.circle(image, tuple(point.astype(int)), 2, (0, 0, 255), -1)
+
+    # Cropping based on the first face and specified ratio
+    cropped_image = None
+    if ratio is not None and ratio > 0:
+        (x1, y1, x2, y2) = faces[0].bbox.astype(int)
+        face_center_x = (x1 + x2) // 2
+        face_center_y = (y1 + y2) // 2
+        face_width = x2 - x1
+        face_height = y2 - y1
+
+        if ratio > 1:
+            target_height = int(face_height * 2)
+            target_width = int(target_height * ratio)
+        else:
+            target_width = int(face_width * 2)
+            target_height = int(target_width / ratio)
+
+        crop_x1 = max(0, face_center_x - target_width // 2)
+        crop_y1 = max(0, face_center_y - target_height // 2)
+        crop_x2 = min(image.shape[1], crop_x1 + target_width)
+        crop_y2 = min(image.shape[0], crop_y1 + target_height)
+
+        # Adjust bounds if too close to edge
+        if crop_x2 - crop_x1 < target_width:
+            if crop_x1 == 0:
+                crop_x2 = min(image.shape[1], target_width)
+            else:
+                crop_x1 = max(0, image.shape[1] - target_width)
+
+        if crop_y2 - crop_y1 < target_height:
+            if crop_y1 == 0:
+                crop_y2 = min(image.shape[0], target_height)
+            else:
+                crop_y1 = max(0, image.shape[0] - target_height)
+
+        cropped_image = image[crop_y1:crop_y2, crop_x1:crop_x2]
+
+    return cropped_image
 
 
 @app.get("/")
@@ -193,7 +258,8 @@ async def crop_image(
         image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
         # Use detect_faces to crop based on face and ratio
-        cropped_image = detect_faces(image_cv, ratio)
+        # cropped_image = detect_faces(image_cv, ratio)
+        cropped_image = detect_faces_retinaface(image_cv, ratio)
 
         # Save the cropped image (detect_faces already saves, but ensure here for clarity)
         if cropped_image is not None:
@@ -227,7 +293,7 @@ async def clear_cropped_uploads():
             file_path = os.path.join(folder_path, filename)
             if os.path.isfile(file_path):
                 os.remove(file_path)  # Delete the file
-        return {"message": "Uploads folder cleared successfully."}
+        return {"message": "Cropped Uploads folder cleared successfully."}
     except Exception as e:
         return {"error": str(e)}  # Return the error message
 
