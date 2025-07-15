@@ -76,14 +76,26 @@
             <div class="form-group">
                 <label for="ratio">Resolution Ratio:</label>
                 <select id="ratio" name="ratio" required>
+                    <option value="0.56">9:16</option>
+                    <option value="0.75">3:4</option>
                     <option value="1.00">1:1</option>
-                    <option value="1.75">16:9</option>
                     <option value="1.33">4:3</option>
                     <option value="1.50">3:2</option>
                     <option value="1.60">16:10</option>
-                    <option value="0.75">3:4</option>
-                    <option value="0.56">9:16</option>
-                    <!-- Add more options as needed -->
+                    <option value="1.75">16:9</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="resolution">Output Resolution:</label>
+                <select id="resolution" name="resolution" required>
+                    <option value="240p">240p (426x240)</option>
+                    <option value="360p">360p (640x360)</option>
+                    <option value="480p">480p (854x480)</option>
+                    <option value="720p">720p (1280x720)</option>
+                    <option value="1080p">1080p (1920x1080)</option>
+                    <option value="1440p">1440p (2560x1440)</option>
+                    <option value="2160p">2160p (3840x2160)</option>
+                    <option value="4320p">4320p (7680x4320)</option>
                 </select>
             </div>
             <button type="submit">Process Image</button>
@@ -111,12 +123,13 @@
             const formData = new FormData();
             const fileInput = document.getElementById('file');
             const ratioInput = document.getElementById('ratio');
+            const resolutionInput = document.getElementById('resolution');
             const resultDiv = document.getElementById('result');
 
             formData.append('file', fileInput.files[0]);
             const ratioValue = parseFloat(ratioInput.value);
-            console.log('Ratio value:', ratioValue);
             formData.append('ratio', ratioValue);
+            formData.append('resolution', resolutionInput.value);
 
             console.log('FormData contents:');
             for (let pair of formData.entries()) {
