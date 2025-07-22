@@ -69,6 +69,7 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
         face_center_y = (y1 + y2) // 2
         
         crop_w = crop_h = None
+        # If width, height, and unit are provided, use the old logic
         if width is not None and height is not None and unit is not None:
             if unit == 'px':
                 crop_w = int(width)
@@ -102,20 +103,39 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
                     crop_y1 = max(0, image.shape[0] - crop_h)
 
             cropped_image = image[crop_y1:crop_y2, crop_x1:crop_x2]
+        else:
+            # New logic: auto-crop with padding if no width/height/dpi provided
+            face_w = x2 - x1
+            face_h = y2 - y1
+            padding_ratio = 0.6  # 40% of face size as padding on each side
+            pad_w = int(face_w * padding_ratio)
+            pad_h = int(face_h * padding_ratio)
 
-            if cropped_image is not None:
-                bg_removed = rembg.remove(cropped_image)
-                # Save the cropped image
-                cv2.imwrite(filePath, bg_removed)
+            crop_x1 = max(0, x1 - pad_w)
+            crop_y1 = max(0, y1 - pad_h)
+            crop_x2 = min(image.shape[1], x2 + pad_w)
+            crop_y2 = min(image.shape[0], y2 + pad_h)
 
-                
-                filename = filePath.split("/")[-1]
-                image_url = f"http://{index.IP}:{index.PORT}/read_cropped_file?filename={filename}"
-                return {"filename": image_url}
-            else:
-                return {"error": "Cropping failed."}
+            # Ensure the crop is at least as big as the face box
+            if crop_x2 - crop_x1 < face_w:
+                crop_x2 = min(image.shape[1], crop_x1 + face_w)
+            if crop_y2 - crop_y1 < face_h:
+                crop_y2 = min(image.shape[0], crop_y1 + face_h)
+
+            cropped_image = image[crop_y1:crop_y2, crop_x1:crop_x2]
+
+        if cropped_image is not None:
+            # Save the cropped image
+            cv2.imwrite(filePath, cropped_image)
+            filename = filePath.split("/")[-1]
+            image_url = f"http://{index.IP}:{index.PORT}/read_cropped_file?filename={filename}"
+            return {"filename": image_url}
+        else:
+            print("Cropping Failed Error")
+            return {"error": "Cropping failed.", "filename": ""}
     except Exception as e:
-        return {"error": str(e)}
+        print("Error in Function", str(e))
+        return {"error": str(e),"filename":""}
         
 
 #===========================================================

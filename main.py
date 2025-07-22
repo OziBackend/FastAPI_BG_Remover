@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Request, Form
 import os
 import io
+import asyncio
 from PIL import Image
 import uuid
 from datetime import datetime
@@ -121,11 +122,17 @@ async def crop_image(
         image_np = np.array(pil_image)
         image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-        result = detect_face_and_crop_image(image_cv, width, height, unit, dpi, cropped_filepath, model, base_name)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            executor,
+            detect_face_and_crop_image,
+            image_cv, width, height, unit, dpi, cropped_filepath, model, base_name
+            )
         return result
 
     except Exception as e:
-        return {"error": str(e)}  # Return the error message
+        print("error", str(e))
+        return {"error": str(e), "filename":""}  # Return the error message
 
 @app.get("/read_cropped_file")
 async def read_cropped_file(request: Request):
