@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Request, Form
+from fastapi import FastAPI, UploadFile, File, Request, Form, HTTPException, status
 import os
 import io
 import asyncio
@@ -75,8 +75,13 @@ async def upload_image(file: UploadFile = File(...)):
         
 
         return {"filename": image_path}
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}  # Return the error message
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 @app.get("/read_file")
 async def read_file(request: Request):  # Accept the request parameter
@@ -100,6 +105,8 @@ async def crop_image(
     print(f"Received file: {file.filename}")  # Log the filename
     print(f"Content type: {file.content_type}")  # Log the content type
     print(f"Width: {width}, Height: {height}, Unit: {unit}")
+    if unit is not None:
+        unit = unit.strip("'").strip('"')
     print(f"DPI: {dpi}")
     try:
         # Create the uploads/cropped_output directory if it doesn't exist
@@ -130,9 +137,14 @@ async def crop_image(
             )
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("error", str(e))
-        return {"error": str(e), "filename":""}  # Return the error message
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 @app.get("/read_cropped_file")
 async def read_cropped_file(request: Request):
