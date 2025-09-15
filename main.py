@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Request, Form, HTTPException, sta
 import os
 import io
 import asyncio
-from PIL import Image
+from PIL import Image, ImageOps
 import uuid
 from datetime import datetime
 from fastapi.responses import HTMLResponse
@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
+import asyncio
 
 from controller.controller import (
     remove_Background,
@@ -68,13 +69,22 @@ async def upload_image(file: UploadFile = File(...)):
         # Convert the file to .webp format
         image = Image.open(io.BytesIO(contents))
         new_filename = f"{file.filename.rsplit('.', 1)[0]}_{unique_id}_{timestamp}.webp"
-        webp_filename = f"uploads/outputs/{new_filename}"
+        webp_filename = f"{new_filename}"
 
-        # Remove background
-        image_path = await executor.submit(remove_Background, image, webp_filename)
-        
-
-        return {"filename": image_path}
+        try:
+            future = executor.submit(remove_Background, image, webp_filename)
+            image_path = await asyncio.wrap_future(future)
+            if not image_path:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Background removal failed: no image path returned"
+                )
+            return {"filename": image_path}
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Processing failed: {e}"
+            )
     except HTTPException:
         raise
     except Exception as e:
@@ -120,12 +130,13 @@ async def crop_image(
 
         # Prepare file paths
         base_name = f"{file.filename.rsplit('.', 1)[0]}_{unique_id}_{timestamp}"
-        cropped_filename = f"{base_name}.jpg"
+        cropped_filename = f"{base_name}.webp"
         cropped_filepath = f"uploads/cropped_output/{cropped_filename}"
 
         # Load image as numpy array (OpenCV expects BGR)
         image_stream = io.BytesIO(contents)
         pil_image = Image.open(image_stream).convert('RGB')
+        pil_image = ImageOps.exif_transpose(pil_image)
         image_np = np.array(pil_image)
         image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 

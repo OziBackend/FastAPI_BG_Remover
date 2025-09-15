@@ -1,6 +1,8 @@
 import cv2
 import os
 from fastapi import HTTPException, status
+from PIL import Image
+import numpy as np
 
 from fastapi.responses import FileResponse
 
@@ -8,11 +10,17 @@ import rembg
 from environment import index
 
 def remove_Background(image, filename):
-    bg_removed = rembg.remove(image)
-    bg_removed.save(filename, 'WEBP')
+    try:
+        bg_removed = rembg.remove(image)
+        output_path = f"uploads/outputs/{filename}"
+        bg_removed.save(output_path, "WEBP")
 
-    image_path = f"http://{index.IP}:{index.PORT}/read_file?filename={filename}"
-    return image_path
+        image_path = f"http://{index.IP}:{index.PORT}/read_file?filename={filename}"
+        print(f"[DEBUG] Successfully processed {filename}, returning {image_path}")
+        return image_path
+    except Exception as e:
+        print(f"[ERROR] remove_Background failed for {filename}: {e}")
+        raise
 
 #===========================================================
 
@@ -88,7 +96,10 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
         bbox_filepath = f"uploads/outputs/{bbox_filename}"
 
         # Save the image with the bounding box
-        cv2.imwrite(bbox_filepath, image_with_bbox)
+        image_rgb = cv2.cvtColor(np.array(image_with_bbox), cv2.COLOR_BGR2RGB)
+        image_pil = Image.fromarray(image_rgb)
+        # image_pil.save(bbox_filepath, 'WEBP')
+        # cv2.imwrite(bbox_filepath, image_with_bbox)
         
         face_center_x = (x1 + x2) // 2
         face_center_y = (y1 + y2) // 2
@@ -96,17 +107,24 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
         # Step 1: First crop with face-centered padding
         face_w = x2 - x1
         face_h = y2 - y1
-        padding_ratio = 0.6  # 40% of face size as padding on each side
-        pad_w = int(face_w * padding_ratio)
-        pad_h = int(face_h * padding_ratio)
-        print("pad_w", pad_w)
-        print("pad_h", pad_h)
 
-        # Calculate initial crop bounds with padding
-        crop_x1 = max(0, x1 - pad_w)
-        crop_y1 = max(0, y1 - pad_h)
-        crop_x2 = min(image.shape[1], x2 + pad_w)
-        crop_y2 = min(image.shape[0], y2 + pad_h)
+        # Different padding ratios for each side
+        pad_left   = int(face_w * 1.0)   # 60% of face width
+        pad_right  = int(face_w * 1.0)   # 60% of face width
+        pad_top    = int(face_h * 1.0)   # 60% of face height
+        pad_bottom = int(face_h * 1.0)   # 120% of face height
+
+        print("pad_left:", pad_left)
+        print("pad_right:", pad_right)
+        print("pad_top:", pad_top)
+        print("pad_bottom:", pad_bottom)
+
+        # Calculate crop bounds with different paddings
+        crop_x1 = max(0, x1 - pad_left)
+        crop_y1 = max(0, y1 - pad_top)
+        crop_x2 = min(image.shape[1], x2 + pad_right)
+        crop_y2 = min(image.shape[0], y2 + pad_bottom)
+
 
         # Ensure the crop is at least as big as the face box
         if crop_x2 - crop_x1 < face_w:
@@ -162,7 +180,10 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
 
         if cropped_image is not None:
             # Save the cropped image
-            cv2.imwrite(filePath, cropped_image)
+            cropped_rgb = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB)
+            cropped_pil= Image.fromarray(cropped_rgb)
+            cropped_pil.save(filePath, 'WEBP')
+            # cv2.imwrite(filePath, cropped_image)
             filename = filePath.split("/")[-1]
             image_url = f"http://{index.IP}:{index.PORT}/read_cropped_file?filename={filename}"
             return {"filename": image_url}
