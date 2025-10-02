@@ -74,7 +74,7 @@ def getTemplate(template_name):
 
 #===========================================================
 
-def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model, base_name, ):
+def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model, base_name):
     try:
         faces = model.get(image)
         if not faces:
@@ -182,6 +182,8 @@ def detect_face_and_crop_image(image, width, height, unit, dpi, filePath, model,
             # Save the cropped image
             cropped_rgb = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB)
             cropped_pil= Image.fromarray(cropped_rgb)
+            print("Removing Background")
+            cropped_pil = rembg.remove(cropped_pil)
             cropped_pil.save(filePath, 'WEBP')
             # cv2.imwrite(filePath, cropped_image)
             filename = filePath.split("/")[-1]

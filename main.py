@@ -110,7 +110,7 @@ async def crop_image(
     width: float = Form(None),
     height: float = Form(None),
     unit: str = Form(None),  # 'px', 'inch', or 'mm',
-    dpi: float = Form(None)
+    dpi: float = Form(None),  
 ):
     print(f"Received file: {file.filename}")  # Log the filename
     print(f"Content type: {file.content_type}")  # Log the content type
